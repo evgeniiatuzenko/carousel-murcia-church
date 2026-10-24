@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Розіграш книг</title>
+<style>
+  :root{--bg:#f7f6f5;--ink:#1a0a0a;--pink:#e8bfdc;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
+  .top,.bottom{display:flex;justify-content:space-between;align-items:center;padding:clamp(8px,2.5vh,28px) clamp(20px,4vw,56px);font-size:clamp(11px,1.8vh,14px);letter-spacing:.02em;text-transform:uppercase}
+  .screen{height:100vh;height:100dvh;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+  h1{font-weight:500;letter-spacing:-.04em;line-height:.95;font-size:clamp(40px,min(15vw,17vh),220px);padding:0 clamp(20px,4vw,56px)}
+  .stage{position:relative;margin:0}
+  .viewport{overflow:hidden;position:relative;padding:clamp(16px,4vh,44px) 0}
+  .track{display:flex;gap:16px;will-change:transform}
+  .card{flex:0 0 var(--cw,280px);height:var(--ch,150px);border:1px solid var(--ink);border-radius:22px;padding:16px 20px;display:flex;flex-direction:column;justify-content:space-between;background:var(--bg);position:relative;transform:rotate(var(--r));}
+  .card small{font-size:max(10px,calc(var(--ch,150px)*.08))}
+  .card b{font-weight:500;font-size:calc(var(--ch,150px)*.17);letter-spacing:-.02em;line-height:1.1}
+  .card i{position:absolute;top:-12px;right:-6px;width:28px;height:28px;border-radius:50%;background:var(--pink);font-style:normal;font-size:12px;display:grid;place-items:center}
+  .pointer{position:absolute;left:50%;top:0;bottom:0;width:0;border-left:2px dashed var(--ink);pointer-events:none;z-index:3}
+  .pointer:before{content:"";position:absolute;top:-2px;left:-9px;border:9px solid transparent;border-top:14px solid var(--ink)}
+  .fade{position:absolute;top:0;bottom:0;width:12vw;z-index:2;pointer-events:none}
+  .fade.l{left:0;background:linear-gradient(90deg,var(--bg),transparent)}
+  .fade.r{right:0;background:linear-gradient(270deg,var(--bg),transparent)}
+  .winner{min-height:clamp(40px,10vh,120px);padding:0 clamp(20px,4vw,56px);font-size:clamp(26px,min(7vw,8.5vh),100px);letter-spacing:-.04em;font-weight:500;line-height:1}
+  .winner span{background:var(--pink);padding:0 .2em;border-radius:.2em;display:inline-block}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;padding:clamp(8px,2vh,24px) clamp(20px,4vw,56px)}
+  button{font:inherit;font-size:14px;text-transform:uppercase;letter-spacing:.04em;border:1px solid var(--ink);background:transparent;color:var(--ink);border-radius:999px;padding:clamp(8px,1.8vh,14px) 28px;cursor:pointer;transition:.15s}
+  button:hover:not(:disabled){background:var(--ink);color:var(--bg)}
+  button.main{background:var(--pink);border-color:var(--ink)}
+  button:disabled{opacity:.3;cursor:default}
+  .count{margin-left:auto;align-self:center;font-size:14px;text-transform:uppercase}
+  .list{padding:8px clamp(20px,4vw,56px) 40px;font-size:15px;line-height:1.7}
+  .list h3{font-weight:500;font-size:14px;text-transform:uppercase;margin-bottom:6px}
+  .list span{display:inline-block;border:1px solid var(--ink);border-radius:999px;padding:3px 14px;margin:0 6px 6px 0;font-size:14px}
+  .empty{padding:60px clamp(20px,4vw,56px);font-size:28px}
+  @media(max-width:600px){.count{margin-left:0;width:100%}}
+</style>
+</head>
+<body>
+<div class="screen">
+<div class="top"><span>Розіграш книг</span><span>©2026</span></div>
+<h1>Розіграш</h1>
+
+<div class="stage" id="stage">
+  <div class="viewport" id="vp"><div class="track" id="track"></div></div>
+  <div class="pointer"></div><div class="fade l"></div><div class="fade r"></div>
+</div>
+
+<div class="winner" id="winner"></div>
+
+<div class="controls">
+  <button class="main" id="spin">Крутити</button>
+  <button id="done" disabled>Готово</button>
+  <button id="reset">Скинути</button>
+  <span class="count" id="count"></span>
+</div>
+</div>
+
+<div class="list" id="list"></div>
+<div class="bottom"><span>Step by step</span><span>→</span></div>
+
+<script>
+const NAMES = [
+  "Анастасія Тодосієнко","Евелін Луцик","Наталія Андрушків","Вікторія Фелінгер",
+  "Валентина Храпак","Євгенія Тузенко","Надія Сидорчук","Ангеліна Вовк",
+  "Естер Нікітюк","Людмила Бабʼяк","Сара Козлова","Кароліна Чвалюк","Галина Чвалюк",
+  "Світлана Крячко","Анна Вінярчик","Любов Мілюкова","Литовченко","Руслана Валькевич",
+  "Аліна Валькевич","Ганна Безкоровайна","Соломія Морозко","Надія Манзич","Марія Валькевич",
+  "Олена Сабрам","Маріам Гусар","Світлана Євсєєнкова","Вікторія Богайчук","Ніна Куньо",
+  "Тетяна Омельчук","Людмила Зацерковна","Галина Семенина",
+  "Катерина Лахута","Поліна Домашенко","Анна Харченко","Галина Кошарська","Тетяна Коваль","Вікторія Демиденко","Анастасія Мозгова","Соломія Гундич"
+];
+const KEY = "raffle-state-v1";
+const STEP = () => card_w() + 16;
+const card_w = () => Math.round(Math.min(300, Math.max(150, window.innerHeight*0.3), window.innerWidth*0.7));
+function setSize(){
+  const r = document.documentElement.style;
+  r.setProperty("--cw", card_w()+"px");
+  r.setProperty("--ch", Math.round(card_w()*0.54)+"px");
+}
+setSize();
+const $ = id => document.getElementById(id);
+let remaining = [...NAMES], winners = [], current = null, spinning = false, center = 0;
+
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.remaining) { remaining = s.remaining.filter(n => NAMES.includes(n)); winners = s.winners || []; } } catch(e){}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({remaining, winners})); } catch(e){} };
+
+function offsetFor(i){ return i*STEP() + card_w()/2 - $("vp").clientWidth/2; }
+
+function build(startIdx){
+  const t = $("track"); t.innerHTML = "";
+  const n = remaining.length;
+  if(!n){ t.style.transform = ""; return; }
+  const copies = Math.ceil(100/n) + 3;
+  const frag = document.createDocumentFragment();
+  for(let c=0;c<copies;c++) remaining.forEach((name,i)=>{
+    const d = document.createElement("div"); d.className = "card";
+    d.style.setProperty("--r", ((c*n+i)%2 ? 2.5 : -3) + "deg");
+    d.innerHTML = `<i>${i+1}</i><small>Книжковий розіграш</small><b>${name}</b>`;
+    frag.appendChild(d);
+  });
+  t.appendChild(frag);
+  center = n + startIdx;
+  t.style.transform = `translateX(${-offsetFor(center)}px)`;
+}
+
+function ui(){
+  $("count").textContent = `У каруселі: ${remaining.length} / ${NAMES.length}`;
+  $("spin").disabled = spinning || remaining.length === 0;
+  $("done").disabled = spinning || !current;
+  $("reset").disabled = spinning;
+  $("winner").innerHTML = current ? `<span>${current}</span>` : (remaining.length ? "" : "Усі учасниці розіграні 🎉");
+  $("list").innerHTML = winners.length ? `<h3>Вже виграли (${winners.length})</h3>` + winners.map(w=>`<span>${w}</span>`).join("") : "";
+  if(!remaining.length) $("track").innerHTML = "";
+}
+
+function spin(){
+  if(spinning || !remaining.length) return;
+  spinning = true; current = null; ui();
+  const n = remaining.length, w = Math.floor(Math.random()*n);
+  const copies = Math.ceil(100/n) + 3;
+  const targetIdx = n*(copies-2) + w;
+  const jitter = (Math.random()-.5) * (card_w()*0.6);
+  const from = offsetFor(center), to = offsetFor(targetIdx) + jitter;
+  const dur = 6500, t0 = performance.now();
+  const ease = x => 1 - Math.pow(1-x, 4);
+  (function frame(now){
+    const p = Math.min(1,(now-t0)/dur);
+    $("track").style.transform = `translateX(${-(from + (to-from)*ease(p))}px)`;
+    if(p < 1) return requestAnimationFrame(frame);
+    current = remaining[w]; spinning = false;
+    build(w); ui();
+  })(t0);
+}
+
+$("spin").onclick = spin;
+$("done").onclick = () => {
+  if(!current) return;
+  const i = remaining.indexOf(current);
+  if(i>-1) remaining.splice(i,1);
+  winners.push(current); current = null; save();
+  build(0); ui();
+};
+$("reset").onclick = () => {
+  if(!confirm("Скинути все та повернути всіх у карусель?")) return;
+  remaining = [...NAMES]; winners = []; current = null; save();
+  build(0); ui();
+};
+window.addEventListener("resize", () => { setSize(); if(!spinning && remaining.length) build(center - remaining.length); });
+
+build(0); ui();
+</script>
+</body>
+</html>
